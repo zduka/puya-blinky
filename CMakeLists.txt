@@ -20,21 +20,27 @@ set(MCU_FLAGS
 
 set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/py32f030.ld)
 
+file(GLOB LL_DRIVER_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/LL/Source/*.c"
+)
 add_executable(${PROJECT_NAME}
     CMSIS/startup_py32f030.S
     CMSIS/PY32F0xx/Source/system_py32f0xx.c
+    ${LL_DRIVER_SOURCES}
     src/main.cpp
 )
 
 # important for Puya's CMSIS libraries so that they know what exact chip to use
 target_compile_definitions(blinky PRIVATE
     PY32F030x8
+    USE_FULL_LL_DRIVER
 )
 
 # CMSIS include folders
 target_include_directories(blinky PRIVATE
     ${CMAKE_SOURCE_DIR}/CMSIS/PY32F0xx/Include
     ${CMAKE_SOURCE_DIR}/CMSIS/Core/Include
+    ${CMAKE_SOURCE_DIR}/LL/Include
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE
