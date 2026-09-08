@@ -24,6 +24,15 @@
             "problemMatcher": [
                 "$gcc"
             ]
+        },
+        {
+            "label": "Attach Picoprobe",
+            "type": "shell",
+            "command": "usbipd.exe attach --wsl --busid=1-2",
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            },
+            "problemMatcher": []
         }
     ]
 }

@@ -184,6 +184,10 @@ g_pfnVectors:
 /* Weak aliases for each handler 
    
    Override any of these in the C code simply by defining a function with the same name. Also useful for just knowing their names:)
+
+   NOTE that those are C names, so when overriding from C++ they *must* be declared as `extern "C"` otherwise the default handler gets called instead. A quick way to verify is inspect the elf file for the handler, T before the name means it is the expected thumb function provided by the user, W means its weak symbol, which is the default implementation, run variant of this:
+
+       arm-none-eabi-nm blinky.elf  | grep RTC_IRQHandler
  */
     .weak      NMI_Handler
     .thumb_set NMI_Handler,Default_Handler
