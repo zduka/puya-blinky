@@ -32,19 +32,13 @@ int main() {
     LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_1, LL_GPIO_SPEED_FREQ_LOW);
 
     // PB1 is off by default, only the RTC interrupt enables it
-    LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_1);
+    LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_1);
 
     while (1)
     {
         LL_GPIO_TogglePin(GPIOA, LL_GPIO_PIN_0);
-        //LL_GPIO_SetOutputPin(GPIOA, LL_GPIO_PIN_0);   // PA0 ON
-        //LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_1); // PB1 OFF
+        LL_GPIO_TogglePin(GPIOB, LL_GPIO_PIN_1);
         delay(100000);
-
-        LL_GPIO_TogglePin(GPIOA, LL_GPIO_PIN_0);
-        //LL_GPIO_ResetOutputPin(GPIOA, LL_GPIO_PIN_0); // PA0 OFF
-        //LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_1);   // PB1 ON
-        delay(200000);
     }
 #ifdef HAHA
     // older CMSIS alone version of the same code with the LL driver

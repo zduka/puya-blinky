@@ -6,7 +6,7 @@
         {
             "label": "Build",
             "type": "shell",
-            "command": "make",
+            "command": "ninja",
             "options": {
                 "cwd": "${workspaceFolder}/build"
             },
@@ -17,7 +17,7 @@
         {
             "label": "Build & Flash",
             "type": "shell",
-            "command": "make && sudo ~/.python-env/bin/pyocd flash blinky.elf -t py32f030x8",
+            "command": "ninja && sudo ~/.python-env/bin/pyocd flash blinky.elf -t py32f030x8",
             "options": {
                 "cwd": "${workspaceFolder}/build"
             },

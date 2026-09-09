@@ -2,6 +2,8 @@
 
 #include <py32f0xx_ll_bus.h>
 #include <py32f0xx_ll_gpio.h>
+#include <py32f0xx_ll_rcc.h>
+#include <py32f0xx_ll_utils.h>
 
 /** PY32F030 Platform Implementation
  */
@@ -12,27 +14,29 @@ public:
 
     /** Enables the */
     static void initialize() {
-        /* Enable HSI */
-        LL_RCC_HSI_Enable();
-        while(LL_RCC_HSI_IsReady() != 1)
-        {
-        }
 
-        /* Set AHB prescaler */
+        // Enable HSI (cannot fail)
+        LL_RCC_HSI_Enable();
+        while(LL_RCC_HSI_IsReady() != 1);
+
+        // Set AHB prescaler
         LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
 
-        /* Configure HSISYS as system clock source */
+        // Configure HSISYS as system clock source (cannot fail)
         LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_HSISYS);
-        while(LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_HSISYS)
-        {
-        }
+        while(LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_HSISYS);
 
-        /* Set APB1 prescaler */
+        // Set APB1 prescaler
         LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_1);
         LL_Init1msTick(8000000);
 
-        /* Update system clock global variable SystemCoreClock (can also be updated by calling SystemCoreClockUpdate function) */
+        // Update system clock global variable SystemCoreClock (can also be updated by calling SystemCoreClockUpdate function)
         LL_SetSystemCoreClock(8000000);
+
+        // enable GPIO clocks for all ports
+        LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOA);
+        LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOB);
+        LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOF);
 
     }
 
@@ -41,13 +45,7 @@ public:
     }
 
     static void delayMs(uint16_t value) {
-/*
-        while (value-- != 0) {
-            // make sure we reset the wdt before cycles for more robustness
-            __asm__ __volatile__ ("wdr"::);
-            _delay_ms(1);
-        }
-*/
+        LL_mDelay(value);
     }
 
     static void sleep() {
@@ -150,46 +148,49 @@ public:
     static constexpr Pin PB8 = Pin::PB8;
     static constexpr Pin UNUSED = Pin::Unused;
 
-    #define GPIO_BANK_ID(PIN) (static_cast<unsigned>(PIN) >> 4)
-    #define GPIO_BANK(PIN) GPIO_BANK_ID(PIN) == 0 ? GPIOA : GPIO_BANK_ID(PIN) == 1 ? GPIOB : GPIO_BANK_ID(PIN) == 2 ? GPIOF : nullptr
-    #define GPIO_PIN(PIN) (1U << (static_cast<unsigned>(PIN)))
+    static constexpr GPIO_TypeDef * pinBank(Pin pin) {
+        switch (static_cast<unsigned>(pin) >> 4) {
+            case 0: return GPIOF;
+            case 1: return GPIOA;
+            case 2: return GPIOB;
+            default: return nullptr;
+        }
+    }
 
-    static void initialize() {
-        LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOA);
-        LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOB);
-        LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOF);
+    static constexpr uint32_t pinMask(Pin pin) {
+        return 1U << (static_cast<unsigned>(pin) & 0xf);
     }
 
     static void setAsOutput(Pin pin) {
-        LL_GPIO_SetPinMode(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_MODE_OUTPUT);
-        LL_GPIO_SetPinOutputType(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_OUTPUT_PUSHPULL);
-        LL_GPIO_SetPinSpeed(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_SPEED_FREQ_LOW);
+        LL_GPIO_SetPinMode(pinBank(pin), pinMask(pin), LL_GPIO_MODE_OUTPUT);
+        LL_GPIO_SetPinOutputType(pinBank(pin), pinMask(pin), LL_GPIO_OUTPUT_PUSHPULL);
+        LL_GPIO_SetPinSpeed(pinBank(pin), pinMask(pin), LL_GPIO_SPEED_FREQ_LOW);
     }
 
     static void setAsInput(Pin pin) {
-        LL_GPIO_SetPinMode(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_MODE_INPUT);
-        LL_GPIO_SetPinPull(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_PULL_NO);
+        LL_GPIO_SetPinMode(pinBank(pin), pinMask(pin), LL_GPIO_MODE_INPUT);
+        LL_GPIO_SetPinPull(pinBank(pin), pinMask(pin), LL_GPIO_PULL_NO);
     }
 
     static void setAsInputPullup(Pin pin) {
-        LL_GPIO_SetPinMode(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_MODE_INPUT);
-        LL_GPIO_SetPinPull(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_PULL_UP);
+        LL_GPIO_SetPinMode(pinBank(pin), pinMask(pin), LL_GPIO_MODE_INPUT);
+        LL_GPIO_SetPinPull(pinBank(pin), pinMask(pin), LL_GPIO_PULL_UP);
     }
 
     static void setAsInputPulldown(Pin pin) {
-        LL_GPIO_SetPinMode(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_MODE_INPUT);
-        LL_GPIO_SetPinPull(GPIO_BANK(pin), GPIO_PIN(pin), LL_GPIO_PULL_DOWN);
+        LL_GPIO_SetPinMode(pinBank(pin), pinMask(pin), LL_GPIO_MODE_INPUT);
+        LL_GPIO_SetPinPull(pinBank(pin), pinMask(pin), LL_GPIO_PULL_DOWN);
     }
 
     static void write(Pin pin, bool value) {
         if (value)
-            LL_GPIO_SetOutputPin(GPIO_BANK(pin), GPIO_PIN(pin));
+            LL_GPIO_SetOutputPin(pinBank(pin), pinMask(pin));
         else
-            LL_GPIO_ResetOutputPin(GPIO_BANK(pin), GPIO_PIN(pin));
+            LL_GPIO_ResetOutputPin(pinBank(pin), pinMask(pin));
     }
 
     static bool read(Pin pin) {
-        return LL_GPIO_IsInputPinSet(GPIO_BANK(pin), GPIO_PIN(pin));
+        return LL_GPIO_IsInputPinSet(pinBank(pin), pinMask(pin));
     }
 
     //#include "../common/gpio_common.h"
