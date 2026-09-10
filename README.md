@@ -42,6 +42,16 @@ This can be executed from WSL as well, just say:
 
 Now the device shall be available in WSL.
 
+In order for the USB to serial to work, the `cdc_acm` must be enabled in WSL, which by default it is on. To enable immediately, run:
+
+    sudo modprobe cdc_acm
+
+To enable always, add `cdc_acm` to `/etc/modules`. Feel free to ignore the warning on Ubuntu 24.04, as the file is included to the load dir. Then to inspect, run `picocom`:
+
+    sudo picocom -b 9600 /dev/ttyACM0
+
+(use `C-a` `C-x` to exit)
+
 ## Blinky Basic Application
 
 First, the CMSIS must be obtained. However, the CMSIS is for the ARM Keil compiler, which is different from the GCC and so things cannot be used directly. Notably, there is no linker script (instead a scatter file) and the startup assembly routine is in a wrong syntax. You can get it from (3), but for now I have taken it from (4) and specifically (5), where it promised to already have GCC variants. But they were not working, so I started more searches and fooling around. Note that we also need the core cortex-m0plus CMSIS, which you can get from (6).
