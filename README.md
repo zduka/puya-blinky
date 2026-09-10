@@ -64,8 +64,10 @@ I have also added a simple `cmake` configuration that ensures the `arm-eabi-none
 ## Things to verify
 
 - [x] GPIO write
-- [ ] UART (TX is enough for debugging purposes)
+- [x] UART (TX is enough for debugging purposes)
+- [x] RTC from internal source
 - [x] RTC from external source
+- [ ] debug why rtc from LSE is so flaky
 - [ ] PWM (and which timers it can be generated from)
 - [ ] ADC (can also try the reverse diode measurements)
 - [ ] sleep and wakeup interrupts

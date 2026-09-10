@@ -27,7 +27,7 @@ add_executable(${PROJECT_NAME}
     CMSIS/startup_py32f030.S
     CMSIS/PY32F0xx/Source/system_py32f0xx.c
     ${LL_DRIVER_SOURCES}
-    src/platform_gpio.cpp
+    src/platform_usart.cpp
 )
 
 # important for Puya's CMSIS libraries so that they know what exact chip to use

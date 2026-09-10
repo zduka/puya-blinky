@@ -3,6 +3,7 @@
 #include <py32f0xx_ll_bus.h>
 #include <py32f0xx_ll_gpio.h>
 #include <py32f0xx_ll_rcc.h>
+#include <py32f0xx_ll_usart.h>
 #include <py32f0xx_ll_utils.h>
 
 /** PY32F030 Platform Implementation
@@ -196,3 +197,94 @@ public:
     //#include "../common/gpio_common.h"
 
 }; 
+
+
+/** Serial (USART)
+ 
+    A very simple serial TX driver mostly for debugging purposes. Although the chip has two USARTs, only the USART1 is supported by the driver so far.
+ */
+
+class serial {
+public:
+
+    /** Returns the alternate function id for the given pin. 
+     
+        Puya uses weird alternate function numbers where different alternate functions have different numbers for different pins. Those are from the Puya datasheet, sections 3.1, 3.2 and 3.3. 
+     */
+    static constexpr unsigned txPinAlternateFunction(gpio::Pin pin) {
+        switch (pin) {
+            case gpio::PF1:
+                return LL_GPIO_AF8_USART1;
+            case gpio::PF3:
+                return LL_GPIO_AF0_USART1;
+            case gpio::PA2:
+                return LL_GPIO_AF1_USART1;
+            case gpio::PA7:
+                return LL_GPIO_AF8_USART1;
+            case gpio::PA9:
+                return LL_GPIO_AF1_USART1;
+            case gpio::PA10:
+                return LL_GPIO_AF8_USART1;
+            case gpio::PA14: // careful this is SWDCLK
+                return LL_GPIO_AF1_USART1;
+            case gpio::PB6:
+                return LL_GPIO_AF0_USART1;
+            case gpio::PB8:
+                return LL_GPIO_AF8_USART1;
+            default:
+                return 0xff;
+        }
+    }
+
+    static constexpr unsigned isValidTxPin(gpio::Pin pin) {
+        return (txPinAlternateFunction(pin) != 0xff);
+    }
+
+    static void initializeTx(uint32_t speed, gpio::Pin txPin) {
+        // ASSERT(isValidTxPin(txPin));
+        // enable USART1 clock
+        LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_USART1);
+
+        // GPIO configuration 
+        LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
+        GPIO_InitStruct.Pin = gpio::pinMask(txPin);
+        GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
+        GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+        GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
+        GPIO_InitStruct.Alternate = txPinAlternateFunction(txPin);
+        LL_GPIO_Init(gpio::pinBank(txPin), & GPIO_InitStruct);
+
+        // USART configuration
+        LL_USART_InitTypeDef USART_InitStruct = {0};
+        USART_InitStruct.BaudRate = speed;
+        USART_InitStruct.DataWidth = LL_USART_DATAWIDTH_8B;
+        USART_InitStruct.StopBits = LL_USART_STOPBITS_1;
+        USART_InitStruct.Parity = LL_USART_PARITY_NONE;
+        USART_InitStruct.TransferDirection = LL_USART_DIRECTION_TX;
+        USART_InitStruct.HardwareFlowControl = LL_USART_HWCONTROL_NONE;
+        USART_InitStruct.OverSampling = LL_USART_OVERSAMPLING_16;
+        LL_USART_Init(USART1, & USART_InitStruct);
+        // Configure as full duplex asynchronous mode
+        LL_USART_ConfigAsyncMode(USART1);
+        // Enable UART module
+        LL_USART_Enable(USART1);
+    }
+
+    static void waitForTx() {
+        while(LL_USART_IsActiveFlag_TXE(USART1) != 1);
+    }
+
+    static void write(char c) {
+        waitForTx();
+        LL_USART_TransmitData8(USART1, c);
+    }
+
+    // TODO this is to be removed as the platform library itself and serial writer provide this
+    static void write(char const * s) {
+        while(*s) {
+            write(*s++);
+        }
+    }
+
+}; // serial
