@@ -5,6 +5,7 @@
 #include <py32f0xx_ll_rcc.h>
 #include <py32f0xx_ll_usart.h>
 #include <py32f0xx_ll_utils.h>
+#include <py32f0xx_ll_tim.h>
 
 /** PY32F030 Platform Implementation
  */
@@ -13,11 +14,32 @@
 class cpu {
 public:
 
+    enum class ClockSpeed : uint32_t {
+        MHz4 = 4000000,
+        MHz8 = 8000000,
+        MHz16 = 16000000,
+        MHz24 = 24000000,
+    };
+
     /** Enables the */
-    static void initialize() {
+    static void initialize(ClockSpeed speed = ClockSpeed::MHz8) {
 
         // Enable HSI (cannot fail)
         LL_RCC_HSI_Enable();
+        switch (speed) {
+            case ClockSpeed::MHz4:
+                LL_RCC_HSI_SetCalibFreq(LL_RCC_HSICALIBRATION_4MHz);
+                break;
+            case ClockSpeed::MHz8:
+                LL_RCC_HSI_SetCalibFreq(LL_RCC_HSICALIBRATION_8MHz);
+                break;
+            case ClockSpeed::MHz16:
+                LL_RCC_HSI_SetCalibFreq(LL_RCC_HSICALIBRATION_16MHz);
+                break;
+            case ClockSpeed::MHz24:
+                LL_RCC_HSI_SetCalibFreq(LL_RCC_HSICALIBRATION_24MHz);
+                break;
+        }
         while(LL_RCC_HSI_IsReady() != 1);
 
         // Set AHB prescaler
@@ -29,10 +51,10 @@ public:
 
         // Set APB1 prescaler
         LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_1);
-        LL_Init1msTick(8000000);
+        LL_Init1msTick(static_cast<uint32_t>(speed));
 
         // Update system clock global variable SystemCoreClock (can also be updated by calling SystemCoreClockUpdate function)
-        LL_SetSystemCoreClock(8000000);
+        LL_SetSystemCoreClock(static_cast<uint32_t>(speed));
 
         // enable GPIO clocks for all ports
         LL_IOP_GRP1_EnableClock(LL_IOP_GRP1_PERIPH_GPIOA);
@@ -83,7 +105,15 @@ public:
 class gpio {
 public:
 
-  enum class Pin {
+    enum class AlternateFunction : uint32_t {
+        USART1_TX,
+        TIM1_CH1,
+        TIM1_CH2,
+        TIM1_CH3,
+        TIM1_CH4,
+    }; // gpio::AlternateFunction
+
+    enum class Pin {
         PF0 = 0x00, 
         PF1,
         PF2,
@@ -194,6 +224,113 @@ public:
         return LL_GPIO_IsInputPinSet(pinBank(pin), pinMask(pin));
     }
 
+    /** Returns the alternate function id for the given pin and alternate function.
+     
+        Puya uses weird alternate function numbers where different alternate functions have different numbers for different pins. Those are from the Puya datasheet, sections 3.1, 3.2 and 3.3. 
+
+        If the pin does not support the given alternate function, 0xff is returned.
+     */
+    static constexpr uint32_t getAlternateFunctionID(Pin pin, AlternateFunction af) {
+        switch (af) {
+            case AlternateFunction::USART1_TX:
+                switch (pin) {
+                    case gpio::PF1:
+                        return LL_GPIO_AF8_USART1;
+                    case gpio::PF3:
+                        return LL_GPIO_AF0_USART1;
+                    case gpio::PA2:
+                        return LL_GPIO_AF1_USART1;
+                    case gpio::PA7:
+                        return LL_GPIO_AF8_USART1;
+                    case gpio::PA9:
+                        return LL_GPIO_AF1_USART1;
+                    case gpio::PA10:
+                        return LL_GPIO_AF8_USART1;
+                    case gpio::PA14: // careful this is SWDCLK
+                        return LL_GPIO_AF1_USART1;
+                    case gpio::PB6:
+                        return LL_GPIO_AF0_USART1;
+                    case gpio::PB8:
+                        return LL_GPIO_AF8_USART1;
+                    default:
+                        return 0xff;
+                }
+            case AlternateFunction::TIM1_CH1:
+                switch (pin) {
+                    case gpio::PA8:
+                        return LL_GPIO_AF2_TIM1;
+                    default:
+                        return 0xff;
+                }
+            case AlternateFunction::TIM1_CH2:
+                switch (pin) {
+                    case gpio::PA9:
+                        return LL_GPIO_AF2_TIM1;
+                    case gpio::PA13: // careful this is SWDIO
+                        return LL_GPIO_AF13_TIM1;
+                    case gpio::PB3:
+                        return LL_GPIO_AF2_TIM1;
+                    default:
+                        return 0xff;
+                }            
+            case AlternateFunction::TIM1_CH3:
+                switch (pin) {
+                    case gpio::PA10:
+                        return LL_GPIO_AF2_TIM1;
+                    case gpio::PB6:
+                        return LL_GPIO_AF2_TIM1;
+                    default:
+                        return 0xff;
+                }
+            case AlternateFunction::TIM1_CH4:
+                switch (pin) {
+                    case gpio::PA11:
+                        return LL_GPIO_AF2_TIM1;
+                    default:
+                        return 0xff;
+                }
+        }
+    }
+
+    static constexpr void configureAsGPIO(Pin pin) {
+        LL_GPIO_InitTypeDef cfg = {0};
+        cfg.Pin = gpio::pinMask(pin);
+        // TODO verify those are defaults
+        cfg.Mode = LL_GPIO_MODE_INPUT;
+        cfg.Speed = LL_GPIO_SPEED_FREQ_LOW;
+        cfg.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+        LL_GPIO_Init(gpio::pinBank(pin), & cfg);
+    }
+
+    static constexpr void configureAsAlternate(Pin pin, AlternateFunction af) {
+        LL_GPIO_InitTypeDef cfg = {0};
+        cfg.Pin = gpio::pinMask(pin);
+        cfg.Mode = LL_GPIO_MODE_ALTERNATE;
+        switch (af) {
+            case AlternateFunction::USART1_TX:
+                cfg.Speed = LL_GPIO_SPEED_FREQ_VERY_HIGH;
+                cfg.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+                cfg.Pull = LL_GPIO_PULL_UP;
+                break;
+            case AlternateFunction::TIM1_CH1:
+            case AlternateFunction::TIM1_CH2:
+            case AlternateFunction::TIM1_CH3:
+            case AlternateFunction::TIM1_CH4:
+                cfg.Speed      = LL_GPIO_SPEED_FREQ_HIGH;
+                cfg.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+                cfg.Pull       = LL_GPIO_PULL_NO;
+                break;
+            default:
+                cfg.Speed      = LL_GPIO_SPEED_FREQ_LOW;
+                cfg.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+                cfg.Pull       = LL_GPIO_PULL_NO;
+                break;
+        }
+        cfg.Alternate = gpio::getAlternateFunctionID(pin, gpio::AlternateFunction::USART1_TX);
+        //ASSERT(cfg.Alternate != 0xff);
+        LL_GPIO_Init(gpio::pinBank(pin), & cfg);
+    }
+
     //#include "../common/gpio_common.h"
 
 }; 
@@ -207,53 +344,13 @@ public:
 class serial {
 public:
 
-    /** Returns the alternate function id for the given pin. 
-     
-        Puya uses weird alternate function numbers where different alternate functions have different numbers for different pins. Those are from the Puya datasheet, sections 3.1, 3.2 and 3.3. 
-     */
-    static constexpr unsigned txPinAlternateFunction(gpio::Pin pin) {
-        switch (pin) {
-            case gpio::PF1:
-                return LL_GPIO_AF8_USART1;
-            case gpio::PF3:
-                return LL_GPIO_AF0_USART1;
-            case gpio::PA2:
-                return LL_GPIO_AF1_USART1;
-            case gpio::PA7:
-                return LL_GPIO_AF8_USART1;
-            case gpio::PA9:
-                return LL_GPIO_AF1_USART1;
-            case gpio::PA10:
-                return LL_GPIO_AF8_USART1;
-            case gpio::PA14: // careful this is SWDCLK
-                return LL_GPIO_AF1_USART1;
-            case gpio::PB6:
-                return LL_GPIO_AF0_USART1;
-            case gpio::PB8:
-                return LL_GPIO_AF8_USART1;
-            default:
-                return 0xff;
-        }
-    }
-
-    static constexpr unsigned isValidTxPin(gpio::Pin pin) {
-        return (txPinAlternateFunction(pin) != 0xff);
-    }
-
     static void initializeTx(uint32_t speed, gpio::Pin txPin) {
-        // ASSERT(isValidTxPin(txPin));
+        // ASSERT(gpio::getAlternateFunctionID(txPin, gpio::AlternateFunction::USART1_TX) != 0xff);
         // enable USART1 clock
         LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_USART1);
 
         // GPIO configuration 
-        LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
-        GPIO_InitStruct.Pin = gpio::pinMask(txPin);
-        GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
-        GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_VERY_HIGH;
-        GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-        GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
-        GPIO_InitStruct.Alternate = txPinAlternateFunction(txPin);
-        LL_GPIO_Init(gpio::pinBank(txPin), & GPIO_InitStruct);
+        gpio::configureAsAlternate(txPin, gpio::AlternateFunction::USART1_TX);
 
         // USART configuration
         LL_USART_InitTypeDef USART_InitStruct = {0};
@@ -288,3 +385,52 @@ public:
     }
 
 }; // serial
+
+/** Advanced Timer 1
+ 
+    Simple interface to the timer. The timer can drive 4 PWM channels from single clock, with different duty cycles. At the moment the platform provides independent control of the channels for the PWM output only, but the timer can do a lot more in the future.
+ */
+class timer1 {
+
+    static void enable() {
+        LL_TIM_InitTypeDef TIM1CountInit = {0};
+        
+        TIM1CountInit.ClockDivision       = LL_TIM_CLOCKDIVISION_DIV1; // No clk division
+        TIM1CountInit.CounterMode         = LL_TIM_COUNTERMODE_UP; // Up counting mode
+
+        TIM1CountInit.Prescaler           = 2400-1; // prescaler 
+        TIM1CountInit.Autoreload          = 1000-1; // autoreload
+        // repetition counter 0 means the timer runs until stopped
+        TIM1CountInit.RepetitionCounter   = 0; 
+        LL_TIM_Init(TIM1,&TIM1CountInit);
+        
+        // enable software control of outputs
+        LL_TIM_EnableAllOutputs(TIM1);
+        // enable the timer
+        LL_TIM_EnableCounter(TIM1);
+
+    }
+
+    static void disable() {
+        LL_TIM_DisableAllOutputs(TIM1);
+        LL_TIM_DisableCounter(TIM1);
+    }
+
+    static void enableChannelPWM(uint32_t channel, uint32_t duty) {
+        LL_TIM_OC_InitTypeDef TIM_OC_Initstruct ={0};
+        TIM_OC_Initstruct.OCMode        = LL_TIM_OCMODE_PWM1;
+        TIM_OC_Initstruct.OCState       = LL_TIM_OCSTATE_ENABLE;  
+        TIM_OC_Initstruct.OCPolarity    = LL_TIM_OCPOLARITY_HIGH; 
+        TIM_OC_Initstruct.OCIdleState   = LL_TIM_OCIDLESTATE_LOW; 
+        TIM_OC_Initstruct.CompareValue  = duty;
+        LL_TIM_OC_Init(TIM1, 1 << (channel * 4), &TIM_OC_Initstruct);
+    }
+
+    static void disableChannel(uint32_t channel) {
+        LL_TIM_OC_InitTypeDef TIM_OC_Initstruct ={0};
+        TIM_OC_Initstruct.OCMode        = LL_TIM_OCMODE_PWM1;     
+        TIM_OC_Initstruct.OCState       = LL_TIM_OCSTATE_DISABLE;
+        LL_TIM_OC_Init(TIM1, 1 << (channel * 4), &TIM_OC_Initstruct);
+    }
+
+}; // timer1
