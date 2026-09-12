@@ -78,7 +78,8 @@ I have also added a simple `cmake` configuration that ensures the `arm-eabi-none
 - [x] RTC from internal source
 - [x] RTC from external source
 - [ ] debug why rtc from LSE is so flaky
-- [ ] PWM (and which timers it can be generated from)
+- [x] PWM timer 1
+- [x] PWM timer 3
 - [ ] ADC (can also try the reverse diode measurements)
 - [ ] sleep and wakeup interrupts
 - [ ] different clocks & power consumption

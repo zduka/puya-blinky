@@ -111,6 +111,10 @@ public:
         TIM1_CH2,
         TIM1_CH3,
         TIM1_CH4,
+        TIM3_CH1,
+        TIM3_CH2,
+        TIM3_CH3,
+        TIM3_CH4,
     }; // gpio::AlternateFunction
 
     enum class Pin {
@@ -257,6 +261,8 @@ public:
                 }
             case AlternateFunction::TIM1_CH1:
                 switch (pin) {
+                    case gpio::PA3:
+                        return LL_GPIO_AF13_TIM1;
                     case gpio::PA8:
                         return LL_GPIO_AF2_TIM1;
                     default:
@@ -269,27 +275,69 @@ public:
                     case gpio::PA13: // careful this is SWDIO
                         return LL_GPIO_AF13_TIM1;
                     case gpio::PB3:
-                        return LL_GPIO_AF2_TIM1;
+                        return LL_GPIO_AF1_TIM1;
                     default:
                         return 0xff;
                 }            
             case AlternateFunction::TIM1_CH3:
                 switch (pin) {
+                    case gpio::PA0:
+                        return LL_GPIO_AF13_TIM1;
                     case gpio::PA10:
                         return LL_GPIO_AF2_TIM1;
                     case gpio::PB6:
-                        return LL_GPIO_AF2_TIM1;
+                        return LL_GPIO_AF1_TIM1;
                     default:
                         return 0xff;
                 }
             case AlternateFunction::TIM1_CH4:
                 switch (pin) {
+                    case gpio::PA1:
+                        return LL_GPIO_AF13_TIM1;
                     case gpio::PA11:
                         return LL_GPIO_AF2_TIM1;
                     default:
                         return 0xff;
                 }
+            case AlternateFunction::TIM3_CH1:
+                switch (pin) {
+                    case gpio::PA2:
+                        return LL_GPIO_AF13_TIM3;
+                    case gpio::PA6:
+                    case gpio::PB4:
+                        return LL_GPIO_AF1_TIM3;
+                    default:
+                        return 0xff;
+                }
+            case AlternateFunction::TIM3_CH2:
+                switch (pin) {
+                    case gpio::PA5:
+                        return LL_GPIO_AF13_TIM3;
+                    case gpio::PA7:
+                    case gpio::PB5:
+                        return LL_GPIO_AF1_TIM3;
+                    default:
+                        return 0xff;
+                }
+            case AlternateFunction::TIM3_CH3:
+                switch (pin) {
+                    case gpio::PA4:
+                    case gpio::PF3:
+                        return LL_GPIO_AF13_TIM3;
+                    case gpio::PB0:
+                        return LL_GPIO_AF1_TIM3;
+                    default:
+                        return 0xff;
+                }
+            case AlternateFunction::TIM3_CH4:
+                switch (pin) {
+                    case gpio::PB1:
+                        return LL_GPIO_AF1_TIM3;
+                    default:
+                        return 0xff;
+                }
         }
+        return 0xff;
     }
 
     static constexpr void configureAsGPIO(Pin pin) {
@@ -302,7 +350,7 @@ public:
         LL_GPIO_Init(gpio::pinBank(pin), & cfg);
     }
 
-    static constexpr void configureAsAlternate(Pin pin, AlternateFunction af) {
+    static void configureAsAlternate(Pin pin, AlternateFunction af) {
         LL_GPIO_InitTypeDef cfg = {0};
         cfg.Pin = gpio::pinMask(pin);
         cfg.Mode = LL_GPIO_MODE_ALTERNATE;
@@ -326,7 +374,7 @@ public:
                 cfg.Pull       = LL_GPIO_PULL_NO;
                 break;
         }
-        cfg.Alternate = gpio::getAlternateFunctionID(pin, gpio::AlternateFunction::USART1_TX);
+        cfg.Alternate = gpio::getAlternateFunctionID(pin, af);
         //ASSERT(cfg.Alternate != 0xff);
         LL_GPIO_Init(gpio::pinBank(pin), & cfg);
     }
@@ -391,18 +439,16 @@ public:
     Simple interface to the timer. The timer can drive 4 PWM channels from single clock, with different duty cycles. At the moment the platform provides independent control of the channels for the PWM output only, but the timer can do a lot more in the future.
  */
 class timer1 {
+public:
 
-    static void enable() {
-        LL_TIM_InitTypeDef TIM1CountInit = {0};
-        
-        TIM1CountInit.ClockDivision       = LL_TIM_CLOCKDIVISION_DIV1; // No clk division
-        TIM1CountInit.CounterMode         = LL_TIM_COUNTERMODE_UP; // Up counting mode
+    static void enable(uint32_t resolution = 256, uint32_t prescaler = 1) {
+        LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_TIM1);
 
-        TIM1CountInit.Prescaler           = 2400-1; // prescaler 
-        TIM1CountInit.Autoreload          = 1000-1; // autoreload
-        // repetition counter 0 means the timer runs until stopped
-        TIM1CountInit.RepetitionCounter   = 0; 
-        LL_TIM_Init(TIM1,&TIM1CountInit);
+        LL_TIM_SetClockDivision(TIM1, LL_TIM_CLOCKDIVISION_DIV1);
+        LL_TIM_SetCounterMode(TIM1, LL_TIM_COUNTERMODE_UP);
+        LL_TIM_SetPrescaler(TIM1, prescaler - 1);
+        LL_TIM_SetAutoReload(TIM1, resolution - 1);
+        LL_TIM_SetRepetitionCounter(TIM1, 0);
         
         // enable software control of outputs
         LL_TIM_EnableAllOutputs(TIM1);
@@ -414,6 +460,7 @@ class timer1 {
     static void disable() {
         LL_TIM_DisableAllOutputs(TIM1);
         LL_TIM_DisableCounter(TIM1);
+        LL_APB1_GRP2_DisableClock(LL_APB1_GRP2_PERIPH_TIM1);
     }
 
     static void enableChannelPWM(uint32_t channel, uint32_t duty) {
@@ -423,14 +470,59 @@ class timer1 {
         TIM_OC_Initstruct.OCPolarity    = LL_TIM_OCPOLARITY_HIGH; 
         TIM_OC_Initstruct.OCIdleState   = LL_TIM_OCIDLESTATE_LOW; 
         TIM_OC_Initstruct.CompareValue  = duty;
-        LL_TIM_OC_Init(TIM1, 1 << (channel * 4), &TIM_OC_Initstruct);
+        LL_TIM_OC_Init(TIM1, 1 << ((channel - 1) * 4), &TIM_OC_Initstruct);
     }
 
     static void disableChannel(uint32_t channel) {
         LL_TIM_OC_InitTypeDef TIM_OC_Initstruct ={0};
         TIM_OC_Initstruct.OCMode        = LL_TIM_OCMODE_PWM1;     
         TIM_OC_Initstruct.OCState       = LL_TIM_OCSTATE_DISABLE;
-        LL_TIM_OC_Init(TIM1, 1 << (channel * 4), &TIM_OC_Initstruct);
+        LL_TIM_OC_Init(TIM1, 1 << ((channel - 1) * 4), &TIM_OC_Initstruct);
     }
 
 }; // timer1
+
+/** Timer 3 (general purpose)
+ 
+    This is less advanced than timer1, but still plenty powerful. The API is identical to that of TIM1, at least for the PWM output already implemented.
+ */
+class timer3 {
+public:
+
+    static void enable(uint32_t resolution = 256, uint32_t prescaler = 1) {
+        LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM3);
+
+        LL_TIM_SetClockDivision(TIM3, LL_TIM_CLOCKDIVISION_DIV1);
+        LL_TIM_SetCounterMode(TIM3, LL_TIM_COUNTERMODE_UP);
+        LL_TIM_SetPrescaler(TIM3, prescaler - 1);
+        LL_TIM_SetAutoReload(TIM3, resolution - 1);
+        LL_TIM_SetRepetitionCounter(TIM3, 0);
+
+        LL_TIM_EnableAllOutputs(TIM3);
+        LL_TIM_EnableCounter(TIM3);
+    }
+
+    static void disable() {
+        LL_TIM_DisableAllOutputs(TIM3);
+        LL_TIM_DisableCounter(TIM3);
+        LL_APB1_GRP1_DisableClock(LL_APB1_GRP1_PERIPH_TIM3);
+    }
+
+    static void enableChannelPWM(uint32_t channel, uint32_t duty) {
+        LL_TIM_OC_InitTypeDef TIM_OC_Initstruct ={0};
+        TIM_OC_Initstruct.OCMode        = LL_TIM_OCMODE_PWM1;
+        TIM_OC_Initstruct.OCState       = LL_TIM_OCSTATE_ENABLE;  
+        TIM_OC_Initstruct.OCPolarity    = LL_TIM_OCPOLARITY_HIGH; 
+        TIM_OC_Initstruct.OCIdleState   = LL_TIM_OCIDLESTATE_LOW; 
+        TIM_OC_Initstruct.CompareValue  = duty;
+        LL_TIM_OC_Init(TIM3, 1 << ((channel - 1) * 4), &TIM_OC_Initstruct);
+    }
+
+    static void disableChannel(uint32_t channel) {
+        LL_TIM_OC_InitTypeDef TIM_OC_Initstruct ={0};
+        TIM_OC_Initstruct.OCMode        = LL_TIM_OCMODE_PWM1;     
+        TIM_OC_Initstruct.OCState       = LL_TIM_OCSTATE_DISABLE;
+        LL_TIM_OC_Init(TIM3, 1 << ((channel - 1) * 4), &TIM_OC_Initstruct);
+    }
+
+}; // timer3
