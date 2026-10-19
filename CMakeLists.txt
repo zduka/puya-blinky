@@ -27,7 +27,7 @@ add_executable(${PROJECT_NAME}
     CMSIS/startup_py32f030.S
     CMSIS/PY32F0xx/Source/system_py32f0xx.c
     ${LL_DRIVER_SOURCES}
-    src/tim1_tim3_pwm.cpp
+    src/platform_rtc.cpp
 )
 
 # important for Puya's CMSIS libraries so that they know what exact chip to use

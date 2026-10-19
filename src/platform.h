@@ -6,6 +6,9 @@
 #include <py32f0xx_ll_usart.h>
 #include <py32f0xx_ll_utils.h>
 #include <py32f0xx_ll_tim.h>
+#include <py32f0xx_ll_rtc.h>
+#include <py32f0xx_ll_pwr.h>
+#include <py32f0xx_ll_exti.h>
 
 /** PY32F030 Platform Implementation
  */
@@ -526,3 +529,68 @@ public:
     }
 
 }; // timer3
+
+/** Real Time Clock 
+ 
+    The chip has an internal 32kHz clock which can be used with zero external parts, but is extremely imprecise. The external clock needs the crystal and load capacitors, but is actually useful for time keeping and thus should be used by default. 
+*/
+class rtc {
+public:
+    /** Enables the RTC clock. 
+   
+        Note that the functions spins forever if the external clock was selected, but cannot be started. Internal clock can always be started by definition.
+     */
+    static void enable(bool internal = false) {
+        LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
+        LL_PWR_EnableBkUpAccess();
+        // reset the backup domain first, LSEON lives in RCC->BDCR and would be cleared by the reset
+        LL_RCC_ForceBackupDomainReset();
+        LL_RCC_ReleaseBackupDomainReset();
+        if (internal) {
+            LL_RCC_LSI_Enable();
+            while (LL_RCC_LSI_IsReady() != 1);
+        } else {
+            LL_RCC_LSE_Enable();
+            while (LL_RCC_LSE_IsReady() != 1);
+        }
+        LL_RCC_SetRTCClockSource(internal ? LL_RCC_RTC_CLKSOURCE_LSI : LL_RCC_RTC_CLKSOURCE_LSE);
+        LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_RTC);
+        LL_RCC_EnableRTC();
+        // wait for the RTC registers to synchronize with the APB clock
+        LL_RTC_WaitForSynchro(RTC);
+        // initialize the RTC to 1Hz
+        LL_RTC_InitTypeDef init{
+            .AsynchPrescaler = 0x7FFF, // 32768 Hz -> 1 Hz
+            .OutPutSource = LL_RTC_CALIB_OUTPUT_NONE
+        };
+        LL_RTC_Init(RTC, &init);
+    }
+
+    /** Enables or disables the second interrupt. 
+     
+        The interrupt routine should look like this:
+
+        extern "C" {
+            void RTC_IRQHandler(void) {
+                if (LL_RTC_IsActiveFlag_SEC(RTC)) {
+                    LL_RTC_ClearFlag_SEC(RTC);
+                    // code
+                }
+            }
+       }
+     */
+    static void enableSecondInterrupt(bool value = true) {
+        if (value) {
+            LL_RTC_EnableIT_SEC(RTC);
+            // RTC interrupt is routed to the NVIC through EXTI line 19
+            LL_EXTI_EnableIT(LL_EXTI_LINE_19);
+            NVIC_SetPriority(RTC_IRQn, 0);
+            NVIC_EnableIRQ(RTC_IRQn);
+        } else {
+            LL_RTC_DisableIT_SEC(RTC);
+        }
+    }
+
+}; // rtc
+
+

@@ -77,7 +77,7 @@ I have also added a simple `cmake` configuration that ensures the `arm-eabi-none
 - [x] UART (TX is enough for debugging purposes)
 - [x] RTC from internal source
 - [x] RTC from external source
-- [ ] debug why rtc from LSE is so flaky
+- [ ] debug why rtc from LSE is so flaky (maybe not any more)
 - [x] PWM timer 1
 - [x] PWM timer 3
 - [ ] ADC (can also try the reverse diode measurements)
@@ -87,7 +87,6 @@ I have also added a simple `cmake` configuration that ensures the `arm-eabi-none
 - [ ] SPI (?)
 - [ ] I2C slave
 - [ ] Neopixel RGB
-- [ ] platform library integration
 
 ## Notes
 
