@@ -80,13 +80,14 @@ I have also added a simple `cmake` configuration that ensures the `arm-eabi-none
 - [ ] debug why rtc from LSE is so flaky (maybe not any more)
 - [x] PWM timer 1
 - [x] PWM timer 3
-- [ ] ADC (can also try the reverse diode measurements)
+- [X] ADC
+- [ ] reverse diode measurements
 - [ ] sleep and wakeup interrupts
 - [ ] different clocks & power consumption
 - [ ] watchdog timer
 - [ ] SPI (?)
 - [ ] I2C slave
-- [ ] Neopixel RGB
+- [ ] Neopixel RGB (via SPI, alternatively PWM could do too it seems)
 
 ## Notes
 
