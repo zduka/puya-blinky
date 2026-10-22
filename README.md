@@ -87,7 +87,7 @@ I have also added a simple `cmake` configuration that ensures the `arm-eabi-none
 - [ ] watchdog timer
 - [ ] SPI (?)
 - [ ] I2C slave
-- [ ] Neopixel RGB (via SPI, alternatively PWM could do too it seems)
+- [X] Neopixel RGB (via SPI, alternatively PWM could do too it seems)
 
 ## Notes
 
